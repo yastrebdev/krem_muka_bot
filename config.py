@@ -3,3 +3,5 @@ import os
 
 load_dotenv()
 BOT_TOKEN = os.getenv('BOT_TOKEN')
+
+CHAT_ID = 895828653

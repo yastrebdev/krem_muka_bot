@@ -1,14 +1,20 @@
 import asyncio
 import logging
 
+from avito import login_and_monitor
 from handlers import routers
 from bot import dp, bot
+
+last_sent = None  # Храним последнее сообщение, чтобы не дублировать
 
 
 async def main():
     for router in routers:
         dp.include_router(router)
-    await dp.start_polling(bot)
+    await asyncio.gather(
+        login_and_monitor(),
+        dp.start_polling(bot)
+    )
 
 
 if __name__ == '__main__':
