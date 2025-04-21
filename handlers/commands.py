@@ -1,18 +1,15 @@
 from aiogram import html, Router, types
 from aiogram.filters import CommandStart, Command
 from aiogram.types import Message, InputMediaPhoto, FSInputFile
-from aiogram.fsm.context import FSMContext
 
 from avito import send_avito_reply
 from avito_chat_store import get_chat_url
 
-# from db.users import create_user, find_user_by_username
-# from states.create_document import CreateDocument
+from db.users import create_user, find_user_by_username
 
 import os
 
 router = Router()
-
 
 @router.message(CommandStart())
 async def start(message: Message):
@@ -25,10 +22,10 @@ async def start(message: Message):
                          "Меню -- /menu\n"
                          "Примеры десертов -- /examples")
 
-    # user = await find_user_by_username(username)
-    #
-    # if not user:
-    #     await create_user(username, name)
+    user = await find_user_by_username(username)
+
+    if not user:
+        await create_user(username, name)
 
 
 @router.message(Command('new_order'))

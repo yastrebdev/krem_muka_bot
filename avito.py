@@ -1,12 +1,13 @@
 import asyncio
+import re
+
 from playwright.async_api import async_playwright, TimeoutError
 
-from bot import send_to_telegram
-
-AVITO_LOGIN_URL = "https://www.avito.ru/profile/login"
-AVITO_MESSENGER_URL = "https://www.avito.ru/profile/messenger"
-LOGIN = "79538055851"
-PASSWORD = "strbvMv_25"
+from utils.send_from_avito_to_telegram import send
+from config import (
+    AVITO_LOGIN,
+    AVITO_PASSWORD,
+    AVITO_MESSENGER_URL, AVITO_PROFILE_URL)
 
 avito_page = None
 avito_ready = asyncio.Event()
@@ -25,7 +26,6 @@ async def fill_input_safe(page, selector, value, label=""):
 
 async def login_and_monitor():
     global avito_page
-    print(1, avito_page)
 
     async with async_playwright() as p:
         browser = await p.chromium.launch(headless=False, slow_mo=50)
@@ -37,41 +37,45 @@ async def login_and_monitor():
         try:
             await page.goto(
                 AVITO_MESSENGER_URL,
-                timeout=60000,  # 60 секунд
-                wait_until="domcontentloaded"  # не ждем всей графики и рекламы
+                timeout=60000,
+                wait_until="domcontentloaded"
             )
         except Exception as e:
             print(f"⚠️ Ошибка при переходе на {AVITO_MESSENGER_URL}: {e}")
-            return  # или restart / notify / pass
+            return
 
-        # Если уже вошли — сразу в мессенджер
         if "profile" in page.url and "login" not in page.url:
             print("✅ Уже авторизованы")
             await page.goto(AVITO_MESSENGER_URL)
         else:
-            # Иногда поля появляются внутри iframe — проверим на всякий
             await page.wait_for_load_state("domcontentloaded")
             print("🔐 Ожидаем форму входа...")
 
-            # Используем более устойчивые селекторы
-            login_filled = await fill_input_safe(page, 'input[type="tel"], input[type="text"]', LOGIN, "Логин")
+            login_filled = await fill_input_safe(
+                page,
+                'input[type="tel"], input[type="text"]',
+                AVITO_LOGIN,
+                "Логин")
             if login_filled:
                 await page.click('button[type="submit"]')
 
-                password_filled = await fill_input_safe(page, 'input[type="password"]', PASSWORD, "Пароль")
+                password_filled = await fill_input_safe(
+                    page,
+                    'input[type="password"]',
+                    AVITO_PASSWORD,
+                    "Пароль")
                 if password_filled:
                     await page.click('button[type="submit"]')
 
-                    # Ждём редиректа в профиль
                     print("⏳ Ожидаем вход/редирект...")
-                    for _ in range(30):  # до 30 сек
-                        if page.url.startswith("https://www.avito.ru/profile"):
+                    for _ in range(30):
+                        if page.url.startswith(AVITO_PROFILE_URL):
                             break
                         await page.wait_for_timeout(1000)
 
-                    if not page.url.startswith("https://www.avito.ru/profile"):
+                    if not page.url.startswith(AVITO_PROFILE_URL):
                         print("⚠️ Похоже, нужно вручную ввести капчу или код из СМС.")
-                        while not page.url.startswith("https://www.avito.ru/profile"):
+                        while not page.url.startswith(AVITO_PROFILE_URL):
                             await asyncio.sleep(2)
                             print("🕵️ Ожидаем вход...")
 
@@ -81,9 +85,27 @@ async def login_and_monitor():
         print("📨 Переходим в мессенджер...")
         await page.goto(AVITO_MESSENGER_URL)
         try:
-            await page.wait_for_selector('[data-marker="channels/channelLink"]', timeout=20000)
+            await page.wait_for_selector(
+                '[data-marker="channels/channelLink"]',
+                timeout=20000)
         except TimeoutError:
             print("⚠️ Сообщения не загружены.")
+
+        await page.wait_for_selector('.controls-grid-row_3cells-HiV_Z')
+        filters = await page.query_selector_all('[data-marker="unreadFilter/toggleButton"]')
+
+        for f in filters:
+            filter_text = await f.inner_text()
+            clean_text = re.sub(r'\s+', ' ', filter_text).strip()
+
+            if "Все сообщения" in clean_text:
+                await f.click()
+                break
+
+        await page.wait_for_selector('button[data-marker="unreadFilter/custom-option(unread)"]')
+
+        unread_button = page.locator('button[data-marker="unreadFilter/custom-option(unread)"]')
+        await unread_button.click()
 
         messages = await page.query_selector_all('[data-marker="channels/channelLink"]')
         print(f"📬 Найдено сообщений: {len(messages)}")
@@ -110,9 +132,11 @@ async def login_and_monitor():
                 if text not in last_messages:
                     full_text = f"<b>Новое сообщение на Авито</b>\n\n{message_id}\n\n{text}"
                     print(f"🔔 Отправка в Telegram:\n{full_text}\n{'-'*40}")
-                    await send_to_telegram(full_text, href)
+                    await send(full_text, href)
 
             last_messages = current_texts
+
+
 avito_ready.set()
 
 
