@@ -1,27 +1,20 @@
 import asyncio
-import re
 
 from playwright.async_api import async_playwright, TimeoutError
+
+from avito_functions import (
+    fill_input_safe, filter_ur_messages
+)
 
 from utils.send_from_avito_to_telegram import send
 from config import (
     AVITO_LOGIN,
     AVITO_PASSWORD,
-    AVITO_MESSENGER_URL, AVITO_PROFILE_URL)
+    AVITO_MESSENGER_URL, AVITO_PROFILE_URL
+)
 
 avito_page = None
 avito_ready = asyncio.Event()
-
-async def fill_input_safe(page, selector, value, label=""):
-    try:
-        print(f"🔍 Ждём поле: {label or selector}")
-        await page.wait_for_selector(selector, timeout=15000, state='visible')
-        await page.fill(selector, value)
-        print(f"✅ Введено: {label or selector}")
-        return True
-    except TimeoutError:
-        print(f"❌ Не найдено поле {label or selector}")
-        return False
 
 
 async def login_and_monitor():
@@ -51,16 +44,15 @@ async def login_and_monitor():
             await page.wait_for_load_state("domcontentloaded")
             print("🔐 Ожидаем форму входа...")
 
-            login_filled = await fill_input_safe(
-                page,
-                'input[type="tel"], input[type="text"]',
+            login_filled = await fill_input_safe(page,
+                'input[type="tel"],'
+                'input[type="text"]',
                 AVITO_LOGIN,
                 "Логин")
             if login_filled:
                 await page.click('button[type="submit"]')
 
-                password_filled = await fill_input_safe(
-                    page,
+                password_filled = await fill_input_safe(page,
                     'input[type="password"]',
                     AVITO_PASSWORD,
                     "Пароль")
@@ -78,7 +70,6 @@ async def login_and_monitor():
                         while not page.url.startswith(AVITO_PROFILE_URL):
                             await asyncio.sleep(2)
                             print("🕵️ Ожидаем вход...")
-
             else:
                 print("❌ Не удалось найти поля входа. Страница могла измениться.")
 
@@ -91,50 +82,40 @@ async def login_and_monitor():
         except TimeoutError:
             print("⚠️ Сообщения не загружены.")
 
-        await page.wait_for_selector('.controls-grid-row_3cells-HiV_Z')
-        filters = await page.query_selector_all('[data-marker="unreadFilter/toggleButton"]')
-
-        for f in filters:
-            filter_text = await f.inner_text()
-            clean_text = re.sub(r'\s+', ' ', filter_text).strip()
-
-            if "Все сообщения" in clean_text:
-                await f.click()
-                break
-
-        await page.wait_for_selector('button[data-marker="unreadFilter/custom-option(unread)"]')
-
-        unread_button = page.locator('button[data-marker="unreadFilter/custom-option(unread)"]')
-        await unread_button.click()
-
-        messages = await page.query_selector_all('[data-marker="channels/channelLink"]')
-        print(f"📬 Найдено сообщений: {len(messages)}")
-        for i, msg in enumerate(messages[:5]):
-            content = await msg.inner_text()
-            print(f"✉️ [{i+1}] {content[:100]}...")
+        await filter_ur_messages(page)
 
         print("⏳ Начинаем мониторинг входящих сообщений...\n")
-        last_messages = set()
 
         while True:
-            await page.wait_for_timeout(10000)
+            await page.wait_for_timeout(500)
 
-            messages = await page.query_selector_all('[data-marker="channels/channelLink"]')
             current_texts = set()
 
-            for msg in messages[:10]:
-                text = (await msg.inner_text()).strip()
-                href = await msg.get_attribute("href")  # ссылка на чат
-                message_id = href or "[no_id]"
+            await page.wait_for_selector('[data-marker="channels/channelLink"]', timeout=0)
+            messages = await page.query_selector_all('[data-marker="channels/channelLink"]')
 
-                current_texts.add(text)
+            if messages:
+                for msg in messages:
+                    text = (await msg.inner_text()).strip()
+                    href = await msg.get_attribute("href")
+                    message_id = href or "[no_id]"
 
-                if text not in last_messages:
+                    current_texts.add(text)
+
                     full_text = f"<b>Новое сообщение на Авито</b>\n\n{message_id}\n\n{text}"
                     print(f"🔔 Отправка в Telegram:\n{full_text}\n{'-'*40}")
                     await send(full_text, href)
 
-            last_messages = current_texts
+            try:
+                await page.wait_for_selector('[data-marker="channels/channelLink"]')
+                label = page.get_by_label("Выбрать все чаты")
+                await label.click()
+
+                await page.wait_for_selector("button[data-marker='bulk-actions/markRead']", timeout=2000)
+                mark_read_button = page.locator("button[data-marker='bulk-actions/markRead']")
+                await mark_read_button.click()
+            except:
+                pass
 
 
 avito_ready.set()

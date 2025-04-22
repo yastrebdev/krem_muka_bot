@@ -2,7 +2,7 @@ from aiogram import html, Router, types
 from aiogram.filters import CommandStart, Command
 from aiogram.types import Message, InputMediaPhoto, FSInputFile
 
-from avito import send_avito_reply
+from avito_monitor_messages import send_avito_reply
 from avito_chat_store import get_chat_url
 
 from db.users import create_user, find_user_by_username

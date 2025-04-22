@@ -1,7 +1,7 @@
 import asyncio
 import logging
 
-from avito import login_and_monitor
+from avito_monitor_messages import login_and_monitor
 from handlers import routers
 from bot import dp, bot
 
@@ -13,7 +13,7 @@ async def main():
         dp.include_router(router)
     await asyncio.gather(
         login_and_monitor(),
-        dp.start_polling(bot)
+        dp.start_polling(bot),
     )
 
 
