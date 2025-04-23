@@ -3,7 +3,7 @@ import asyncio
 from playwright.async_api import async_playwright, TimeoutError
 
 from avito_functions import (
-    fill_input_safe, filter_ur_messages
+    fill_input_safe, filter_ur_messages, read_messages
 )
 
 from utils.send_from_avito_to_telegram import send
@@ -107,13 +107,7 @@ async def login_and_monitor():
                     await send(full_text, href)
 
             try:
-                await page.wait_for_selector('[data-marker="channels/channelLink"]')
-                label = page.get_by_label("Выбрать все чаты")
-                await label.click()
-
-                await page.wait_for_selector("button[data-marker='bulk-actions/markRead']", timeout=2000)
-                mark_read_button = page.locator("button[data-marker='bulk-actions/markRead']")
-                await mark_read_button.click()
+                await read_messages(page)
             except:
                 pass
 

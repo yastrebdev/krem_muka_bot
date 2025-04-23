@@ -8,4 +8,7 @@ AVITO_PASSWORD = os.getenv('AVITO_PASSWORD')
 
 AVITO_PROFILE_URL = "https://www.avito.ru/profile"
 AVITO_MESSENGER_URL = "https://www.avito.ru/profile/messenger"
+
 CHAT_ID = 895828653
+
+ADMIN_IDS = [CHAT_ID]

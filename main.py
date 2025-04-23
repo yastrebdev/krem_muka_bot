@@ -4,8 +4,7 @@ import logging
 from avito_monitor_messages import login_and_monitor
 from handlers import routers
 from bot import dp, bot
-
-last_sent = None  # Храним последнее сообщение, чтобы не дублировать
+from handlers.set_commands import set_commands
 
 
 async def main():
@@ -13,6 +12,7 @@ async def main():
         dp.include_router(router)
     await asyncio.gather(
         login_and_monitor(),
+        set_commands(bot),
         dp.start_polling(bot),
     )
 

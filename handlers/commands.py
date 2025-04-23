@@ -3,7 +3,8 @@ from aiogram.filters import CommandStart, Command
 from aiogram.types import Message, InputMediaPhoto, FSInputFile
 
 from avito_monitor_messages import send_avito_reply
-from avito_chat_store import get_chat_url
+from avito_functions.avito_chat_store import get_chat_url
+from config import ADMIN_IDS
 
 from db.users import create_user, find_user_by_username
 
@@ -60,21 +61,24 @@ async def menu(message: Message):
 
 @router.message(Command("answer"))
 async def cmd_reply(message: types.Message):
-    try:
-        parts = message.text.split(maxsplit=2)
-        _, chat_id, reply_text = parts
-    except ValueError:
-        await message.reply("⚠️ Формат: /ответ <chat_id> <текст>")
-        return
+    if message.from_user.id not in ADMIN_IDS:
+        await message.answer("❌ Вам не доступна эта команда.")
+    else:
+        try:
+            parts = message.text.split(maxsplit=2)
+            _, chat_id, reply_text = parts
+        except ValueError:
+            await message.reply("⚠️ Формат: /ответ <chat_id> <текст>")
+            return
 
-    chat_url = get_chat_url(chat_id)
-    if not chat_url:
-        await message.reply("❌ Чат не найден.")
-        return
+        chat_url = get_chat_url(chat_id)
+        if not chat_url:
+            await message.reply("❌ Чат не найден.")
+            return
 
-    await message.reply("⏳ Переход в чат и отправка сообщения...")
-    try:
-        await send_avito_reply(chat_url, reply_text)
-        await message.reply("✅ Ответ отправлен!")
-    except Exception as e:
-        await message.reply(f"❌ Ошибка: {e}")
+        await message.reply("⏳ Переход в чат и отправка сообщения...")
+        try:
+            await send_avito_reply(chat_url, reply_text)
+            await message.reply("✅ Ответ отправлен!")
+        except Exception as e:
+            await message.reply(f"❌ Ошибка: {e}")
