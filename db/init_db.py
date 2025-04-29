@@ -38,7 +38,7 @@ def init_db():
         delivery_method CHAR(1) NOT NULL CHECK(delivery_method = 'С' OR delivery_method = 'Д'),
         delivery_price INTEGER DEFAULT 0,
         flau_price INTEGER DEFAULT 0,
-        source VARCHAR(32) NOT NULL,  -- <<< Переименовал "from" на "source"
+        source VARCHAR(32) NOT NULL,
         time TIME,
         order_date DATE,
         is_completed BOOLEAN NOT NULL,

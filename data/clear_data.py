@@ -1,11 +1,25 @@
 # -*- coding: windows-1251 -*-
+import re
 
 import pandas as pd
 import numpy as np
 
-from clear.clear_empty_fields import clear_empty_fields
-from clear.drop_columns import drop_columns
-from clear.rename_columns import rename_columns
+# for Box-Cox Transformation
+from scipy import stats
+
+# for min_max scaling
+from mlxtend.preprocessing import minmax_scaling
+
+# plotting modules
+import seaborn as sns
+import matplotlib.pyplot as plt
+
+import datetime
+
+from clear import (
+    clear_empty_fields, drop_columns, rename_columns)
+
+np.random.seed(0)
 
 orders_data = pd.read_csv("data/km_orders.csv", sep=";", encoding="Windows-1251", skiprows=1)
 
@@ -25,19 +39,33 @@ new_columns = ['is_completed',
                'flau_price',
                'prepayment',
                'event',
-               'data']
+               'date']
 
 rename_columns(df, new_columns)
 
 df['is_completed'] =(
     df['is_completed'].apply(lambda x: True if x == 'да' else False))
 
-def process_time(x):
-    if pd.isna(x):
-        return "00:00"
 
-    return x
+def time_formatting(cell):
+    try:
+        time = str(cell).strip().lower()
 
-df['time'] = df['time'].apply(process_time)
+        clear_time = re.findall(r'[^А-ЯЁа-яё]+', time)
+        print(clear_time)
 
-print(df)
+        if pd.isna(cell) or str(cell).strip() == '':
+            time = '00:00'
+
+        return pd.Series([time, ''])
+
+    except Exception as e:
+        print(f'time_formating error: {e}')
+        return pd.Series(['00:00', ''])
+
+
+df[['time', 'time_comment']] = df['time'].apply(lambda cell: pd.Series(time_formatting(cell)))
+
+pd.set_option('display.max_rows', None)
+
+# print(df[['time', 'time_comment']])
